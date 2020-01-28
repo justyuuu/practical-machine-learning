@@ -1,0 +1,143 @@
+---
+title: "Prediction Assignment Writeup"
+author: "justyuuu"
+date: "1/27/2020"
+output: html_document
+---
+
+```{r setup, echo=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+## Loading and processing data
+
+### Data source
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+### Data processing 
+
+```{r}
+# set up environment
+library(caret)
+library(rpart)
+library(randomForest)
+library(RCurl)
+library(corrplot)
+set.seed(13)
+```
+
+
+```{r}
+#download data
+setwd("/Users/justyuuu/Desktop/data science/practical machine learining")
+
+if (!file.exists("./data")) {
+  dir.create("./data")
+}
+
+if (!file.exists("./data/pml-testing.csv")) {
+  testingUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+  download.file(testingUrl, destfile = "./data/pml-testing.csv")
+}
+
+
+if (!file.exists("./data/pml-training.csv")) {
+  trainingUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+  download.file(trainingUrl, destfile = "./data/pml-training.csv")
+}
+```
+
+```{r}
+#read data
+testing <- read.csv("./data/pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+training <- read.csv("./data/pml-training.csv", na.strings=c("NA","#DIV/0!","")) 
+```
+
+```{r}
+# remove missing value
+training <-training[,colSums(is.na(training)) == 0]
+testing <-testing[,colSums(is.na(testing)) == 0]
+
+# remove useless columns
+training <-training[,-c(1:7)]
+testing <-testing[,-c(1:7)]
+
+dim(training)
+```
+
+```{r}
+dim(testing )
+```
+
+### Data Partitioning
+
+```{r}
+# Partitions training dataset on 70,30 ratio
+PartTrain  <- createDataPartition(training$classe, p=0.7, list=FALSE)
+
+TrainSet <- training[PartTrain, ]
+
+TestSet  <- training[-PartTrain, ]
+```
+
+```{r}
+dim(TrainSet)
+```
+
+```{r}
+dim(TestSet)
+```
+
+## Data Prediction and Modeling 
+
+### Random Forest Model（RF)
+
+```{r}
+library(e1071)
+# Fitting model
+model1 <- randomForest(classe ~., data=TrainSet, method="class")
+
+# Predicting
+prediction1 <- predict(model1, TestSet, Type="class")
+
+# Testing
+confusionMatrix(prediction1, TestSet$classe)
+```
+
+The accuracy of the model is 99.29%.
+
+### Generalized Boosted Model (GBM)
+
+```{r}
+library(gbm)
+# Fitting model
+ControlGBM <- trainControl(method="repeatedcv", number=5, repeats=1)
+model2 <- train(classe ~., data=TrainSet, method="gbm", trControl=ControlGBM, verbose=FALSE)
+
+# Predicting
+prediction2 <- predict(model2, TestSet)
+
+# Testing
+confusionMatrix(prediction2, TestSet$classe)
+```
+
+The accuracy of the model is 96.13%.
+
+## Result
+The accuracy of RE is higher than GBM. In this case, the RF model will be applied to predict the quiz
+```{r}
+predictTest <- predict(model1, newdata=testing)
+predictTest
+```
